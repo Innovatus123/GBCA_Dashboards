@@ -1,0 +1,7 @@
+# Member-level engagement data and the reports built from it stay out of this
+# repository: it is public. Keep them on SharePoint.
+engagement/data/
+engagement/reports/
+*.psv
+*.xlsx
+__pycache__/
