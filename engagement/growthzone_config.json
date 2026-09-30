@@ -1,0 +1,73 @@
+{
+  "base_url": "https://generalbuildingcontractorsassociationagc.growthzoneapp.com",
+  "membership_types": {
+    "GBCA Active Member": "Active",
+    "GBCA Associate Member": "Associate",
+    "GBCA Affiliate Member": "Affiliate"
+  },
+  "active_membership_statuses": [
+    "Active"
+  ],
+  "custom_fields": {
+    "Member Spotlights": [
+      "Member Spotlights",
+      "Member Spotlight"
+    ],
+    "Member Recognition Awards": [
+      "Member Recognition Awards",
+      "Member Recognition Award"
+    ],
+    "All Committee Participation": [
+      "All Committee Participation",
+      "Committee Participation"
+    ],
+    "Tuition Reimbursement": [
+      "Tuition Reimbursement"
+    ],
+    "Issue Resolution Assistance": [
+      "Issue Resolution Assistance"
+    ],
+    "Content Contributor": [
+      "Content Contributor"
+    ],
+    "Hosted/Utilized Meeting Space": [
+      "Hosted/Utilized Meeting Space",
+      "Hosted Meeting Space"
+    ],
+    "GBCA Vendor": [
+      "GBCA Vendor"
+    ],
+    "Special Member Programs": [
+      "Special Member Programs"
+    ],
+    "All Bargaining Rights": [
+      "All Bargaining Rights",
+      "Bargaining Rights"
+    ]
+  },
+  "committee_groups": {
+    "board": [
+      "Board of Directors"
+    ],
+    "committee": [
+      "Committee"
+    ]
+  },
+  "purchases": {
+    "window_start": "2025-01-01",
+    "dues_type_match": [
+      "member",
+      "dues"
+    ]
+  },
+  "events": {
+    "source": "activities",
+    "activity_match": [
+      "event",
+      "registered",
+      "attended"
+    ],
+    "window_start": "2025-01-01"
+  },
+  "baseline_file": "data/baseline.json"
+}

@@ -15,9 +15,11 @@ this repository; point --data at a local folder):
 
   committee:  "" none, "C" committee only, "B" Board only, "BC" Board + committee
   issue/content/bargaining: "1" if the GrowthZone field is populated
-  rep_score/rep_risk: score and level from the published risk-analysis file
+  rep_score/rep_risk: score and level from the published risk-analysis file;
+                      blank for data pulled fresh from GrowthZone (growthzone.py)
 
 Usage:  python score_engagement.py --data <folder> [--json out.json]
+        (growthzone.py pull / from-export writes a folder in this format)
 """
 
 import argparse
@@ -28,6 +30,7 @@ import os
 from collections import Counter
 
 LEVELS = ["Highly Engaged", "Engaged", "Low Risk", "Moderate Risk", "High Risk"]
+SHORT = {"Highly Engaged": "HiEng", "Engaged": "Eng", "Low Risk": "Low", "Moderate Risk": "Mod", "High Risk": "HiRisk"}
 
 # Upper bound (inclusive) of each risk band. Decimal scores between bands
 # (e.g. 40.2) fall into the higher band, matching the published model.
@@ -133,14 +136,16 @@ def run(folder):
     for member_type, scorer in SCORERS.items():
         rows = []
         for m in load(folder, member_type):
-            reported = round(scorer(m, corrected=False), 2)
+            has_published = m["rep_score"] != ""
             corrected = round(scorer(m, corrected=True), 2)
-            if abs(reported - float(m["rep_score"])) > 0.06 or classify(member_type, reported) != m["rep_risk"]:
-                result["mismatches"].append((member_type, m["name"], reported, m["rep_score"], m["rep_risk"]))
+            if has_published:
+                reported = round(scorer(m, corrected=False), 2)
+                if abs(reported - float(m["rep_score"])) > 0.06 or classify(member_type, reported) != m["rep_risk"]:
+                    result["mismatches"].append((member_type, m["name"], reported, m["rep_score"], m["rep_risk"]))
             rows.append({
                 "name": m["name"],
-                "reported_score": float(m["rep_score"]),
-                "reported_level": m["rep_risk"],
+                "reported_score": float(m["rep_score"]) if has_published else None,
+                "reported_level": m["rep_risk"] or None,
                 "corrected_score": corrected,
                 "corrected_level": classify(member_type, corrected),
                 "years": num(m["years"]) or 0,
@@ -151,13 +156,13 @@ def run(folder):
                 "blank_spend": m["non_spend"] == "",
                 "dues_populated": m["mem_spend"] != "",
             })
-        published = Counter(r["reported_level"] for r in rows) + Counter(FOOTER_ROWS[member_type])
-        result["types"][member_type] = {
-            "members": rows,
-            "published": {lvl: published.get(lvl, 0) for lvl in LEVELS},
-            "reported": {lvl: sum(r["reported_level"] == lvl for r in rows) for lvl in LEVELS},
-            "corrected": {lvl: sum(r["corrected_level"] == lvl for r in rows) for lvl in LEVELS},
-        }
+        views = {"members": rows,
+                 "corrected": {lvl: sum(r["corrected_level"] == lvl for r in rows) for lvl in LEVELS}}
+        if rows and all(r["reported_level"] for r in rows):
+            published = Counter(r["reported_level"] for r in rows) + Counter(FOOTER_ROWS[member_type])
+            views["published"] = {lvl: published.get(lvl, 0) for lvl in LEVELS}
+            views["reported"] = {lvl: sum(r["reported_level"] == lvl for r in rows) for lvl in LEVELS}
+        result["types"][member_type] = views
     return result
 
 
@@ -167,15 +172,17 @@ def pct(n, d):
 
 def print_summary(result):
     for view in ("published", "reported", "corrected"):
+        if not all(view in t for t in result["types"].values()):
+            continue
         print(f"\n== {view.upper()} ==")
         total = Counter()
         for member_type, t in result["types"].items():
             n = sum(t[view].values())
             total.update(t[view])
-            print(f"{member_type:10} n={n:3}  " + "  ".join(f"{lvl[:4]} {t[view][lvl]:3} ({pct(t[view][lvl], n)})" for lvl in LEVELS))
+            print(f"{member_type:10} n={n:3}  " + "  ".join(f"{SHORT[lvl]} {t[view][lvl]:3} ({pct(t[view][lvl], n)})" for lvl in LEVELS))
         n = sum(total.values())
         at_risk = total["Moderate Risk"] + total["High Risk"]
-        print(f"{'Overall':10} n={n:3}  " + "  ".join(f"{lvl[:4]} {total[lvl]:3} ({pct(total[lvl], n)})" for lvl in LEVELS))
+        print(f"{'Overall':10} n={n:3}  " + "  ".join(f"{SHORT[lvl]} {total[lvl]:3} ({pct(total[lvl], n)})" for lvl in LEVELS))
         print(f"           Moderate + High Risk: {at_risk} ({pct(at_risk, n)})")
     print(f"\nReproduction mismatches: {len(result['mismatches'])}")
     for mismatch in result["mismatches"]:
