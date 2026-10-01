@@ -143,15 +143,6 @@ def parse_date(value):
         return None
 
 
-def years_since(start, today):
-    return today.year - start.year - ((today.month, today.day) < (start.month, start.day))
-
-
-def years_from_active_for(text):
-    match = re.search(r"(\d+)\s*year", text or "", re.I)
-    return int(match.group(1)) if match else None
-
-
 def money(value):
     if value in (None, ""):
         return None
@@ -298,29 +289,17 @@ def active_members(gz, config, today):
     GrowthZone names Active and Associate types by dollar-volume tier
     ("GBCA Active Member - Over $100 Million"), so types are matched by word."""
     statuses = {s.lower() for s in config["active_membership_statuses"]}
-    members, earliest = {}, {}
+    members = {}
     for m in gz.paged("/api/memberships/all"):
         mtype = member_type_of(m.get("Type"), config)
         cid = m.get("ContactId")
         start = parse_date(m.get("StartDate"))
-        if cid and start and mtype:
-            earliest[cid] = min(start, earliest.get(cid, start))
         if cid and mtype and (m.get("Status") or "").lower() in statuses:
-            members[cid] = {"type": mtype, "type_name": m.get("Type"), "name": m.get("Name")}
-    for cid, m in members.items():
-        m["years"] = years_since(earliest[cid], today) if cid in earliest else None
+            # GrowthZone's "Years as a Member" is the calendar-year difference from the current
+            # membership's start (matches the Aug 4 2026 export for all 338 matched members).
+            members[cid] = {"type": mtype, "type_name": m.get("Type"), "name": m.get("Name"),
+                            "years": today.year - start.year if start else None}
     return members
-
-
-def years_from_summary(general):
-    """Tenure from the organization's membership summary, e.g. "21 years, 8 months Exp: 12/26"."""
-    best = None
-    for m in general.get("Memberships") or []:
-        text = m.get("SummaryDescription") or ""
-        if re.search(r"\d+\s*(year|month|day)", text, re.I):
-            years = years_from_active_for(text) or 0
-            best = years if best is None else max(best, years)
-    return best
 
 
 def cmd_discover(config, args):
@@ -443,11 +422,10 @@ def member_row(cid, m, fields, general, config):
             if key:
                 by_name[key.lower()] = custom_field_text(f)
     contacts = general.get("Contacts") or []
-    years = years_from_summary(general)
     row = {"GrowthZone Contact Id": cid,
            "Contact Name": general.get("ContactDisplayName") or m["name"],
            "Membership Type": m["type_name"],
-           "Years as a Member": years if years is not None else ("" if m["years"] is None else m["years"]),
+           "Years as a Member": "" if m["years"] is None else m["years"],
            "Active Individuals with Business": (contacts[0].get("TotalRecordAvailable") or len(contacts)) if contacts else 0}
     for column, candidates in config["custom_fields"].items():
         row[column] = next((by_name[c.lower()] for c in candidates if by_name.get(c.lower())), "")
