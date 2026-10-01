@@ -24,19 +24,22 @@ python growthzone.py check                      # key works; member counts by ty
 python growthzone.py discover                   # raw samples -> data/discovery/, lists custom-field names
 python growthzone.py pull --out data/<date>     # builds the 17-column report + scorer inputs
 python score_engagement.py --data data/<date> --json data/<date>/scores.json
+python build_report.py --scores data/<date>/scores.json --compare data/<earlier>/scores.json \
+    --as-of "<date>" --window "<window>" --out reports/GBCA_Member_Engagement_Report_<date>.html
 ```
 
 `discover` shows the custom-field names and activity descriptions GrowthZone actually returns. Check them against `growthzone_config.json` before relying on `pull`. These parts of the config are the ones most likely to need adjusting:
 
-| Report field | Where `pull` gets it | Confidence |
-|---|---|---|
-| Member, type, years as member | `/api/memberships/all` | High (documented schema) |
-| Spotlights, awards, committee, tuition, issue resolution, content, meeting space, vendor, special programs, bargaining rights | Organization custom fields (`/api/contacts/{id}/NotesAndFields`), matched by the names in `custom_fields` | High once names are confirmed |
-| Committee participation, bargaining rights | Category lists "Comm Member Participation" and "Bargaining Rights" on the organization record, as GrowthZone support described the report's sources | High |
-| Committee fallback | Group memberships (`/api/contacts/OrgGeneral/{id}`) | Medium |
-| Active individuals | Related contacts on the organization record | Medium |
-| Membership and non-dues spend | `/api/purchase`, matched by organization name, trailing 12 months by default (the saved report's window) | Medium: verify totals; GrowthZone counts individual PAC gifts by company contacts as non-dues spend |
-| Event attendees | Contact activity log, matched by `events.activity_match`, trailing 12 months; GrowthZone counts registrants, not check-ins | Low until verified |
+| Report field | Where `pull` gets it |
+|---|---|
+| Member, type, tenure | `/api/memberships/all` (types carry a dollar-volume tier, matched by word) and the membership summary on the organization record |
+| Spotlights, awards, tuition, issue resolution, content, meeting space, vendor, special programs | Organization custom fields (`/api/contacts/{id}/NotesAndFields`), year multi-selects |
+| Committee participation, bargaining rights | "Committee Participation" and "Bargaining Rights" category lists on the organization record |
+| Active individuals | Related contacts on the organization record (`TotalRecordAvailable`) |
+| Event attendees | Quantities on "Event Registration" line items in the window (GrowthZone counts registrants) |
+| Membership and non-dues spend | Every purchase in the window (`/api/purchase`, then `/api/thirdparty/purchase/{id}`), credited to the member billed or the member a paying individual belongs to; "Membership Dues" line items are dues, everything else is non-dues |
+
+The window defaults to the trailing 12 months, the saved GrowthZone report's window; `--window-start`/`--window-end` override it. Purchase details are cached in `data/cache/` so reruns are fast.
 
 `pull` prints a reconciliation against the Aug 4, 2026 export (member counts, event totals and spend totals by type) and field coverage. It exits without scoring if any scored field comes back empty, because an empty field silently understates every score. The comparison baseline (Aug 4, 2026 totals by type) lives in the git-ignored `data/baseline.json`, since spend totals should not be public. Set both date windows to match the saved GrowthZone report before comparing totals.
 

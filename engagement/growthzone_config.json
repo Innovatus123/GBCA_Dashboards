@@ -38,7 +38,8 @@
       "GBCA Vendor"
     ],
     "Special Member Programs": [
-      "Special Member Programs"
+      "Special Member Programs",
+      "Special Member Programs & PA One Calls"
     ],
     "All Bargaining Rights": [
       "All Bargaining Rights",
@@ -47,6 +48,7 @@
   },
   "category_lists": {
     "All Committee Participation": [
+      "Committee Participation",
       "Comm Member Participation"
     ],
     "All Bargaining Rights": [
@@ -61,21 +63,24 @@
       "Committee"
     ]
   },
+  "window": {
+    "start": "trailing_12_months"
+  },
   "purchases": {
-    "window_start": "trailing_12_months",
-    "dues_type_match": [
-      "member",
-      "dues"
+    "dues_fee_types": [
+      "Membership Dues"
+    ],
+    "event_fee_types": [
+      "Event Registration"
     ]
   },
   "events": {
-    "source": "activities",
+    "source": "purchases",
     "activity_match": [
       "event",
       "registered",
       "attended"
-    ],
-    "window_start": "trailing_12_months"
+    ]
   },
   "baseline_file": "data/baseline.json"
 }

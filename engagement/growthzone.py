@@ -23,6 +23,7 @@ Examples
   python growthzone.py check
   python growthzone.py discover --out data/discovery
   python growthzone.py pull --out data/2026-10-01
+  python growthzone.py pull --window-start 2025-08-04 --window-end 2026-08-04 --out data/recon
   python growthzone.py from-export --active a.csv --associate b.csv --affiliate c.csv --out data/2026-10-01
   python score_engagement.py --data data/2026-10-01
 """
@@ -38,6 +39,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TYPES = ("Active", "Associate", "Affiliate")
@@ -291,25 +293,34 @@ def cmd_check(config, args):
 
 
 def active_members(gz, config, today):
-    """ContactId -> {name, type, years} for current members of the mapped types."""
+    """ContactId -> {name, type, type_name, years} for current members of the mapped types.
+
+    GrowthZone names Active and Associate types by dollar-volume tier
+    ("GBCA Active Member - Over $100 Million"), so types are matched by word."""
     statuses = {s.lower() for s in config["active_membership_statuses"]}
     members, earliest = {}, {}
     for m in gz.paged("/api/memberships/all"):
-        type_name = m.get("Type") if m.get("Type") in config["membership_types"] else m.get("Name")
-        mtype = config["membership_types"].get(type_name)
+        mtype = member_type_of(m.get("Type"), config)
         cid = m.get("ContactId")
         start = parse_date(m.get("StartDate"))
         if cid and start and mtype:
             earliest[cid] = min(start, earliest.get(cid, start))
-        if not (cid and mtype and (m.get("Status") or "").lower() in statuses):
-            continue
-        members[cid] = {"type": mtype, "type_name": type_name, "name": m.get("Name"),
-                        "active_for": years_from_active_for(m.get("MembershipActiveFor"))}
+        if cid and mtype and (m.get("Status") or "").lower() in statuses:
+            members[cid] = {"type": mtype, "type_name": m.get("Type"), "name": m.get("Name")}
     for cid, m in members.items():
-        signals = [m["active_for"], years_since(earliest[cid], today) if cid in earliest else None]
-        signals = [y for y in signals if y is not None]
-        m["years"] = max(signals) if signals else None
+        m["years"] = years_since(earliest[cid], today) if cid in earliest else None
     return members
+
+
+def years_from_summary(general):
+    """Tenure from the organization's membership summary, e.g. "21 years, 8 months Exp: 12/26"."""
+    best = None
+    for m in general.get("Memberships") or []:
+        text = m.get("SummaryDescription") or ""
+        if re.search(r"\d+\s*(year|month|day)", text, re.I):
+            years = years_from_active_for(text) or 0
+            best = years if best is None else max(best, years)
+    return best
 
 
 def cmd_discover(config, args):
@@ -358,97 +369,145 @@ def cmd_discover(config, args):
     print(f"\nRaw samples written to {args.out} ({gz.calls} API calls). Keep this folder out of git.")
 
 
-def purchases_by_member(gz, config, member_names):
-    """Normalized display name -> (dues total, non-dues total) inside the purchase window."""
-    start = window_start(config["purchases"]["window_start"])
-    dues_match = [s.lower() for s in config["purchases"]["dues_type_match"]]
-    totals = {}
-    rows = gz.get("/api/purchase") or []
-    rows = rows.get("Results", rows) if isinstance(rows, dict) else rows
-    for p in rows:
+def purchase_activity(gz, config, member_ids, person_to_org, start, end, cache_dir, workers):
+    """Org ContactId -> {"dues", "other", "events"} from purchases dated inside [start, end].
+
+    A purchase counts toward the member organization it was billed to, or the
+    organization of the person who paid. Line items typed as membership dues are
+    dues; every other line item is non-dues spend. Event attendees are the
+    quantities on event registration line items, since GrowthZone counts
+    registrants as attendees."""
+    listing = gz.get("/api/purchase") or []
+    listing = listing.get("Results", listing) if isinstance(listing, dict) else listing
+    ids = []
+    for p in listing:
         when = parse_date(p.get("PurchaseDate"))
-        key = norm_name(p.get("ContactDisplayName"))
-        if not when or when < start or key not in member_names:
-            continue
-        dues, other = totals.get(key, (0.0, 0.0))
-        amount = float(p.get("Total") or 0)
-        if any(s in (p.get("PurchaseType") or "").lower() for s in dues_match):
-            dues += amount
-        else:
-            other += amount
-        totals[key] = (dues, other)
+        if when and start <= when <= end:
+            ids.append(p["PurchaseId"])
+    os.makedirs(cache_dir, exist_ok=True)
+
+    def detail(pid):
+        path = os.path.join(cache_dir, f"{pid}.json")
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        data = gz.get(f"/api/thirdparty/purchase/{pid}") or {}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return data
+
+    dues_types = {t.lower() for t in config["purchases"]["dues_fee_types"]}
+    event_types = {t.lower() for t in config["purchases"]["event_fee_types"]}
+    totals, unmatched = {}, 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for n, p in enumerate(pool.map(detail, ids), 1):
+            candidates = [p.get("ContactId")] + [c.get("ContactId") for c in p.get("Contacts") or []]
+            org = next((c for c in candidates if c in member_ids), None)
+            if org is None:
+                org = next((person_to_org[c] for c in candidates if c in person_to_org), None)
+            if org is None:
+                unmatched += 1
+                continue
+            t = totals.setdefault(org, {"dues": 0.0, "other": 0.0, "events": 0})
+            for item in p.get("LineItems") or []:
+                fee = (item.get("FeeItemType") or "").lower()
+                amount = float(item.get("Total") or 0)
+                if fee in dues_types:
+                    t["dues"] += amount
+                else:
+                    t["other"] += amount
+                if fee in event_types:
+                    t["events"] += int(item.get("Quantity") or 1)
+            if n % 250 == 0:
+                print(f"  {n}/{len(ids)} purchases read ({gz.calls} API calls)")
+    print(f"{len(ids)} purchases from {start} to {end}; {unmatched} not tied to a current member")
     return totals
 
 
-def norm_name(text):
-    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
-
-
-def event_count(general, config):
-    if config["events"]["source"] != "activities":
-        return None
-    start = window_start(config["events"]["window_start"])
+def event_count(general, config, start, end):
+    """Event count from the contact activity log (used when events.source is "activities")."""
     words = [w.lower() for w in config["events"]["activity_match"]]
     count = 0
     for a in (general or {}).get("Activities") or []:
         when = parse_date(a.get("ActivityDate"))
-        if when and when >= start and any(w in (a.get("Description") or "").lower() for w in words):
+        if when and start <= when <= end and any(w in (a.get("Description") or "").lower() for w in words):
             count += 1
     return count
+
+
+def member_row(cid, m, fields, general, config):
+    """One report row for a member organization from its custom fields and profile."""
+    by_name = {}
+    for f in fields.get("Fields") or []:
+        for key in (f.get("DisplayName"), f.get("Name")):
+            if key:
+                by_name[key.lower()] = custom_field_text(f)
+    contacts = general.get("Contacts") or []
+    years = years_from_summary(general)
+    row = {"GrowthZone Contact Id": cid,
+           "Contact Name": general.get("ContactDisplayName") or m["name"],
+           "Membership Type": m["type_name"],
+           "Years as a Member": years if years is not None else ("" if m["years"] is None else m["years"]),
+           "Active Individuals with Business": (contacts[0].get("TotalRecordAvailable") or len(contacts)) if contacts else 0}
+    for column, candidates in config["custom_fields"].items():
+        row[column] = next((by_name[c.lower()] for c in candidates if by_name.get(c.lower())), "")
+    # Committee participation and bargaining rights are category lists on the organization record.
+    for column, lists in config.get("category_lists", {}).items():
+        wanted = {name.lower() for name in lists}
+        names = [part.strip() for c in general.get("Categories") or []
+                 if (c.get("CategoryListName") or "").lower() in wanted and c.get("Name")
+                 for part in c["Name"].split(";") if part.strip()]
+        if names:
+            row[column] = ",".join(names)
+    if not row["All Committee Participation"]:
+        groups = [g.get("Name") or "" for g in general.get("Groups") or []]
+        labels = []
+        if any(b.lower() in g.lower() for g in groups for b in config["committee_groups"]["board"]):
+            labels.append("Board of Directors")
+        if any(w.lower() in g.lower() for g in groups for w in config["committee_groups"]["committee"]):
+            labels.append("Committee Participation")
+        row["All Committee Participation"] = ",".join(labels)
+    return row
 
 
 def cmd_pull(config, args):
     gz = client(config, args)
     today = dt.date.today()
+    start = parse_date(args.window_start) if args.window_start else window_start(config["window"]["start"], today)
+    end = parse_date(args.window_end) if args.window_end else today
     members = active_members(gz, config, today)
-    print(f"{len(members)} current members of mapped types")
+    print(f"{len(members)} current members of mapped types; events and spend from {start} to {end}")
 
-    board = config["committee_groups"]["board"]
-    committee_words = config["committee_groups"]["committee"]
-    report_rows = []
-    for i, (cid, m) in enumerate(sorted(members.items(), key=lambda x: x[1]["name"] or ""), 1):
-        fields = gz.get(f"/api/contacts/{cid}/NotesAndFields") or {}
-        general = gz.get(f"/api/contacts/OrgGeneral/{cid}") or {}
-        by_name = {}
-        for f in fields.get("Fields") or []:
-            for key in (f.get("DisplayName"), f.get("Name")):
-                if key:
-                    by_name[key.lower()] = custom_field_text(f)
-        name = general.get("ContactDisplayName") or m["name"]
-        row = {"GrowthZone Contact Id": cid, "Contact Name": name, "Membership Type": m["type_name"],
-               "Years as a Member": "" if m["years"] is None else m["years"],
-               "Active Individuals with Business": len(general.get("Contacts") or [])}
-        for column, candidates in config["custom_fields"].items():
-            row[column] = next((by_name[c.lower()] for c in candidates if by_name.get(c.lower())), "")
-        # Committee participation and bargaining rights live in category lists, per GrowthZone support.
-        for column, lists in config.get("category_lists", {}).items():
-            wanted = {name.lower() for name in lists}
-            names = [c.get("Name") for c in general.get("Categories") or []
-                     if (c.get("CategoryListName") or "").lower() in wanted and c.get("Name")]
-            if names:
-                row[column] = ",".join(names)
-        if not row["All Committee Participation"]:
-            groups = [g.get("Name") or "" for g in general.get("Groups") or []]
-            labels = []
-            if any(b.lower() in g.lower() for g in groups for b in board):
-                labels.append("Board of Directors")
-            if any(w.lower() in g.lower() for g in groups for w in committee_words):
-                labels.append("Committee Participation")
-            row["All Committee Participation"] = ",".join(labels)
-        events = event_count(general, config)
-        row["Count of Event Attendees"] = "" if events is None else events
-        report_rows.append(row)
-        if i % 25 == 0:
-            print(f"  {i}/{len(members)} members pulled ({gz.calls} API calls)")
+    def fetch(item):
+        cid, m = item
+        return cid, m, gz.get(f"/api/contacts/{cid}/NotesAndFields") or {}, gz.get(f"/api/contacts/OrgGeneral/{cid}") or {}
 
+    report_rows, generals, person_to_org = [], {}, {}
+    ordered = sorted(members.items(), key=lambda x: x[1]["name"] or "")
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        for i, (cid, m, fields, general) in enumerate(pool.map(fetch, ordered), 1):
+            report_rows.append(member_row(cid, m, fields, general, config))
+            generals[cid] = general
+            for c in general.get("Contacts") or []:
+                if c.get("ContactId"):
+                    person_to_org.setdefault(c["ContactId"], cid)
+            if i % 50 == 0:
+                print(f"  {i}/{len(members)} members pulled ({gz.calls} API calls)")
+
+    activity = {}
     try:
-        spend = purchases_by_member(gz, config, {norm_name(r["Contact Name"]) for r in report_rows})
-        for row in report_rows:
-            dues, other = spend.get(norm_name(row["Contact Name"]), (0.0, 0.0))
-            row["Membership Spend"] = f"{dues:.2f}" if dues else ""
-            row["Non-Membership Spend"] = f"{other:.2f}" if other else "0"
+        activity = purchase_activity(gz, config, set(members), person_to_org, start, end, args.cache, args.workers)
     except GrowthZoneError as e:
-        print(f"Purchases unavailable, spend left blank: {e}")
+        print(f"Purchases unavailable, spend and purchase-based events left blank: {e}")
+    for row in report_rows:
+        cid = row["GrowthZone Contact Id"]
+        a = activity.get(cid, {"dues": 0.0, "other": 0.0, "events": 0})
+        row["Membership Spend"] = f"{a['dues']:.2f}" if a["dues"] else ""
+        row["Non-Membership Spend"] = f"{a['other']:.2f}" if a["other"] else "0"
+        if config["events"]["source"] == "purchases":
+            row["Count of Event Attendees"] = a["events"]
+        else:
+            row["Count of Event Attendees"] = event_count(generals[cid], config, start, end)
 
     problems = reconcile(report_rows, config)
     normalized = normalize(report_rows, config)
@@ -498,6 +557,11 @@ def main():
     p = sub.add_parser("pull")
     p.add_argument("--out", default=os.path.join(HERE, "data", dt.date.today().isoformat()))
     p.add_argument("--allow-gaps", action="store_true", help="write outputs even if a scored field is empty")
+    p.add_argument("--window-start", help="first day for events and spend (default: trailing 12 months)")
+    p.add_argument("--window-end", help="last day for events and spend (default: today)")
+    p.add_argument("--workers", type=int, default=4, help="parallel API requests")
+    p.add_argument("--cache", default=os.path.join(HERE, "data", "cache", "purchases"),
+                   help="folder for cached purchase details (git-ignored)")
     e = sub.add_parser("from-export")
     e.add_argument("--active")
     e.add_argument("--associate")
