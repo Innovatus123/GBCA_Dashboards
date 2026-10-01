@@ -45,6 +45,14 @@
       "Bargaining Rights"
     ]
   },
+  "category_lists": {
+    "All Committee Participation": [
+      "Comm Member Participation"
+    ],
+    "All Bargaining Rights": [
+      "Bargaining Rights"
+    ]
+  },
   "committee_groups": {
     "board": [
       "Board of Directors"
@@ -54,7 +62,7 @@
     ]
   },
   "purchases": {
-    "window_start": "2025-01-01",
+    "window_start": "trailing_12_months",
     "dues_type_match": [
       "member",
       "dues"
@@ -67,7 +75,7 @@
       "registered",
       "attended"
     ],
-    "window_start": "2025-01-01"
+    "window_start": "trailing_12_months"
   },
   "baseline_file": "data/baseline.json"
 }

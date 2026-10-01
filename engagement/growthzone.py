@@ -124,6 +124,14 @@ class GrowthZone:
 
 # -- value helpers -------------------------------------------------------------
 
+def window_start(value, today=None):
+    """Window start from config: an ISO date, or "trailing_12_months" (GrowthZone's report window)."""
+    today = today or dt.date.today()
+    if value == "trailing_12_months":
+        return today - dt.timedelta(days=365)
+    return parse_date(value)
+
+
 def parse_date(value):
     if not value:
         return None
@@ -352,7 +360,7 @@ def cmd_discover(config, args):
 
 def purchases_by_member(gz, config, member_names):
     """Normalized display name -> (dues total, non-dues total) inside the purchase window."""
-    start = parse_date(config["purchases"]["window_start"])
+    start = window_start(config["purchases"]["window_start"])
     dues_match = [s.lower() for s in config["purchases"]["dues_type_match"]]
     totals = {}
     rows = gz.get("/api/purchase") or []
@@ -379,7 +387,7 @@ def norm_name(text):
 def event_count(general, config):
     if config["events"]["source"] != "activities":
         return None
-    start = parse_date(config["events"]["window_start"])
+    start = window_start(config["events"]["window_start"])
     words = [w.lower() for w in config["events"]["activity_match"]]
     count = 0
     for a in (general or {}).get("Activities") or []:
@@ -412,6 +420,13 @@ def cmd_pull(config, args):
                "Active Individuals with Business": len(general.get("Contacts") or [])}
         for column, candidates in config["custom_fields"].items():
             row[column] = next((by_name[c.lower()] for c in candidates if by_name.get(c.lower())), "")
+        # Committee participation and bargaining rights live in category lists, per GrowthZone support.
+        for column, lists in config.get("category_lists", {}).items():
+            wanted = {name.lower() for name in lists}
+            names = [c.get("Name") for c in general.get("Categories") or []
+                     if (c.get("CategoryListName") or "").lower() in wanted and c.get("Name")]
+            if names:
+                row[column] = ",".join(names)
         if not row["All Committee Participation"]:
             groups = [g.get("Name") or "" for g in general.get("Groups") or []]
             labels = []

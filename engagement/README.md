@@ -32,10 +32,11 @@ python score_engagement.py --data data/<date> --json data/<date>/scores.json
 |---|---|---|
 | Member, type, years as member | `/api/memberships/all` | High (documented schema) |
 | Spotlights, awards, committee, tuition, issue resolution, content, meeting space, vendor, special programs, bargaining rights | Organization custom fields (`/api/contacts/{id}/NotesAndFields`), matched by the names in `custom_fields` | High once names are confirmed |
+| Committee participation, bargaining rights | Category lists "Comm Member Participation" and "Bargaining Rights" on the organization record, as GrowthZone support described the report's sources | High |
 | Committee fallback | Group memberships (`/api/contacts/OrgGeneral/{id}`) | Medium |
 | Active individuals | Related contacts on the organization record | Medium |
-| Membership and non-dues spend | `/api/purchase`, matched by organization name, from `purchases.window_start` | Medium: verify totals |
-| Event attendees | Contact activity log, matched by `events.activity_match`, from `events.window_start` | Low until verified |
+| Membership and non-dues spend | `/api/purchase`, matched by organization name, trailing 12 months by default (the saved report's window) | Medium: verify totals; GrowthZone counts individual PAC gifts by company contacts as non-dues spend |
+| Event attendees | Contact activity log, matched by `events.activity_match`, trailing 12 months; GrowthZone counts registrants, not check-ins | Low until verified |
 
 `pull` prints a reconciliation against the Aug 4, 2026 export (member counts, event totals and spend totals by type) and field coverage. It exits without scoring if any scored field comes back empty, because an empty field silently understates every score. The comparison baseline (Aug 4, 2026 totals by type) lives in the git-ignored `data/baseline.json`, since spend totals should not be public. Set both date windows to match the saved GrowthZone report before comparing totals.
 
