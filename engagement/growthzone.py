@@ -12,6 +12,8 @@ Commands
   from-export  Normalize a GrowthZone report export (.csv, or .xlsx with openpyxl)
                into the files score_engagement.py reads. Report footer lines
                ("Count\\Average\\Totals", "Generated ... by ...") are dropped.
+  import-file  Write a Contacts > Import file that puts each member's engagement
+               score and level into GrowthZone custom fields (the API cannot write).
 
 Credentials (never commit them)
   GROWTHZONE_API_KEY       API key from GrowthZone > Settings > Advanced Settings >
@@ -25,7 +27,8 @@ Examples
   python growthzone.py pull --out data/2026-10-01
   python growthzone.py pull --window-start 2025-08-04 --window-end 2026-08-04 --out data/recon
   python growthzone.py from-export --active a.csv --associate b.csv --affiliate c.csv --out data/2026-10-01
-  python score_engagement.py --data data/2026-10-01
+  python score_engagement.py --data data/2026-10-01 --json data/2026-10-01/scores.json
+  python growthzone.py import-file --scores data/2026-10-01/scores.json
 """
 
 import argparse
@@ -524,6 +527,77 @@ def cmd_from_export(config, args):
           + f" (dropped {dropped} footer or non-member lines)")
 
 
+def name_key(name):
+    return re.sub(r"[^a-z0-9]+", " ", str(name or "").casefold()).strip()
+
+
+def read_accounts(path):
+    """Name -> account number from a GrowthZone contacts export with Account Number and name columns."""
+    if path.lower().endswith((".xlsx", ".xlsm")):
+        try:
+            import openpyxl
+        except ImportError:
+            sys.exit("Reading .xlsx needs openpyxl (pip install openpyxl), or save the export as .csv.")
+        ws = openpyxl.load_workbook(path, read_only=True, data_only=True).active
+        rows = [["" if c is None else str(c) for c in r] for r in ws.iter_rows(values_only=True)]
+    else:
+        with open(path, newline="", encoding="utf-8-sig") as f:
+            rows = list(csv.reader(f))
+    for i, row in enumerate(rows):
+        header = [h.strip().lower() for h in row]
+        acct = next((j for j, h in enumerate(header) if "account" in h), None)
+        name = next((j for j, h in enumerate(header) if h in ("organization name", "contact name", "name", "organization")), None)
+        if acct is not None and name is not None:
+            return {name_key(r[name]): r[acct].strip() for r in rows[i + 1:] if len(r) > max(acct, name)}
+    sys.exit(f"{path}: no header row with an Account Number column and an Organization Name column.")
+
+
+def api_accounts(gz, config):
+    """Name -> account number for current members, via /api/contacts (ContactListItem.AccountNumber)."""
+    members = active_members(gz, config, dt.date.today())
+    numbers = {c.get("ContactId"): (c.get("AccountNumber") or "").strip()
+               for c in gz.paged("/api/contacts") if c.get("ContactId") in members}
+    return {name_key(m["name"]): numbers.get(cid, "") for cid, m in members.items()}
+
+
+def cmd_import_file(config, args):
+    """Write a GrowthZone Contact Import file that sets each member's engagement score and level.
+
+    The API is read-only, so scores go back in through Contacts > Import, which updates an
+    existing contact when the file's Account Number matches it."""
+    fields = config.get("import_fields", {})
+    score_col = fields.get("score", "Engagement Score")
+    level_col = fields.get("level", "Engagement Risk Level")
+    with open(args.scores, encoding="utf-8") as f:
+        scores = json.load(f)
+    accounts = read_accounts(args.accounts) if args.accounts else api_accounts(client(config, args), config)
+    rows, missing = [], []
+    for mtype in TYPES:
+        for m in scores["types"][mtype]["members"]:
+            number = accounts.get(name_key(m["name"]), "")
+            row = {"Account Number": number, "Organization Name": m["name"], "Membership Type": mtype,
+                   score_col: f"{m['corrected_score']:.1f}", level_col: m["corrected_level"]}
+            (rows if number else missing).append(row)
+    numbers = [r["Account Number"] for r in rows]
+    dupes = sorted({n for n in numbers if numbers.count(n) > 1})
+    if dupes:
+        sys.exit(f"Account numbers shared by more than one member: {dupes}. Fix them in GrowthZone first; "
+                 "an import would write one member's score onto another.")
+    columns = ["Account Number", "Organization Name", "Membership Type", score_col, level_col]
+    os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
+    for path, data in ((args.out, rows), (args.out.replace(".csv", "_no_account_number.csv"), missing)):
+        if path == args.out or data:
+            with open(path, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=columns, lineterminator="\n")
+                w.writeheader()
+                w.writerows(data)
+    print(f"Wrote {args.out}: {len(rows)} members ready to import")
+    if missing:
+        print(f"{len(missing)} member(s) have no account number in GrowthZone and were left out "
+              f"(listed in {os.path.basename(args.out.replace('.csv', '_no_account_number.csv'))}). "
+              "Assign account numbers in GrowthZone, then rerun.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Pull GBCA member engagement data from GrowthZone.")
     parser.add_argument("--config", default=os.path.join(HERE, "growthzone_config.json"))
@@ -545,9 +619,16 @@ def main():
     e.add_argument("--associate")
     e.add_argument("--affiliate")
     e.add_argument("--out", default=os.path.join(HERE, "data", dt.date.today().isoformat()))
+    i = sub.add_parser("import-file")
+    i.add_argument("--scores", required=True, help="scores.json from score_engagement.py")
+    i.add_argument("--accounts", help="contacts export with Account Number and Organization Name "
+                                      "(default: look account numbers up through the API)")
+    i.add_argument("--out", default=os.path.join(
+        HERE, "reports", f"GBCA_GrowthZone_Engagement_Import_{dt.date.today().isoformat()}.csv"))
     args = parser.parse_args()
     config = load_config(args.config)
-    commands = {"check": cmd_check, "discover": cmd_discover, "pull": cmd_pull, "from-export": cmd_from_export}
+    commands = {"check": cmd_check, "discover": cmd_discover, "pull": cmd_pull, "from-export": cmd_from_export,
+                "import-file": cmd_import_file}
     try:
         commands[args.command](config, args)
     except GrowthZoneError as e:

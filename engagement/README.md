@@ -43,6 +43,20 @@ The window defaults to the trailing 12 months, the saved GrowthZone report's win
 
 `pull` prints a reconciliation against the Aug 4, 2026 export (member counts, event totals and spend totals by type) and field coverage. It exits without scoring if any scored field comes back empty, because an empty field silently understates every score. The comparison baseline (Aug 4, 2026 totals by type) lives in the git-ignored `data/baseline.json`, since spend totals should not be public. Set both date windows to match the saved GrowthZone report before comparing totals.
 
+## Writing scores back to GrowthZone
+
+The API is read-only (GBCA's published spec has no endpoint that creates a field or writes a value), so scores go back through GrowthZone's own import:
+
+1. One time, a GrowthZone admin creates two Organization custom fields at **Settings > Custom Fields > Add**: `Engagement Score` (Text) and `Engagement Risk Level` (Dropdown: Highly Engaged, Engaged, Low Risk, Moderate Risk, High Risk). Other names go in `import_fields` in `growthzone_config.json`.
+2. Build the import file:
+   ```
+   python growthzone.py import-file --scores data/<date>/scores.json
+   ```
+   It looks up each member's account number through the API. Without a key, pass a GrowthZone contacts export that has Account Number and Organization Name columns: `--accounts contacts.csv`. Members with no account number are listed in a separate `_no_account_number.csv`, and the command stops if two members share an account number.
+3. In GrowthZone, run **Contacts > Import** with the file and map the two score columns to the custom fields. Import updates a contact whose Account Number matches instead of creating a new one.
+
+Once imported, the fields can be added as columns and filters in any GrowthZone contact report.
+
 ## Without the API: a GrowthZone report export
 
 Export the "GBCA Member Engagement Report" for each member type (.csv, or .xlsx with `pip install openpyxl`), then:

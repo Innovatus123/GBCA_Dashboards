@@ -82,5 +82,9 @@
       "attended"
     ]
   },
-  "baseline_file": "data/baseline.json"
+  "baseline_file": "data/baseline.json",
+  "import_fields": {
+    "score": "Engagement Score",
+    "level": "Engagement Risk Level"
+  }
 }
