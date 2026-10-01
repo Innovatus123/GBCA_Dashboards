@@ -1,0 +1,28 @@
+{
+  "weeks_shown": 13,
+  "timezone": "America/New_York",
+  "classes": ["Active", "Associate", "Affiliate"],
+  "sync_root": "/0 - GBCA SharePoint/Dashboards/",
+  "links": {
+    "map": {
+      "rel": "Components/01_Member_Map/GBCA Member Map.html",
+      "web": "https://generalbuildingcontractors-my.sharepoint.com/personal/jellington_gbca_com/Documents/0%20-%20GBCA%20SharePoint/Dashboards/Components/01_Member_Map/GBCA%20Member%20Map.html"
+    },
+    "report": {
+      "rel": "Components/02_Member_Engagement/GBCA_Member_Engagement_Report.html",
+      "web": "https://generalbuildingcontractors-my.sharepoint.com/personal/jellington_gbca_com/Documents/0%20-%20GBCA%20SharePoint/Dashboards/Components/02_Member_Engagement/GBCA_Member_Engagement_Report.html"
+    }
+  },
+  "targets": {
+    "_note": "Engaged share targets (0-1) for the 2026 scorecards. null shows 'No target' until leadership signs off.",
+    "Active": null,
+    "Associate": null,
+    "Affiliate": null,
+    "All": null
+  },
+  "risk_alert_share": 0.5,
+  "min_members": 300,
+  "max_drop": 0.10,
+  "stale_days": 8,
+  "max_bundle_file_bytes": 24000
+}

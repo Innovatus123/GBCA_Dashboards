@@ -73,6 +73,8 @@ python weekly.py --prev <last week's GBCA_Member_Engagement_Scores_<date>.json> 
 
 The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one. The key comes from `GROWTHZONE_API_KEY` when it is set; otherwise `--key-file` reads it from a text file, and the key is never printed. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
 
+The GBCA Dashboard (`../dashboard`) reads the uploaded report every Sunday night for its member count and engagement section, so keep the report's `VALIDATED` counts and "Live GrowthZone data as of" line intact.
+
 ## Without the API: a GrowthZone report export
 
 Export the "GBCA Member Engagement Report" for each member type (.csv, or .xlsx with `pip install openpyxl`), then:

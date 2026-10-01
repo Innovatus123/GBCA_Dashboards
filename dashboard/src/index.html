@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GBCA Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Carlito:wght@400;700&family=Gelasio:wght@700&display=swap">
+<!--STYLE-->
+</head>
+<body>
+<div class="stripe"></div>
+<header class="mast">
+  <div class="wrap">
+    <div class="brandrow">
+      <span class="gbca-logo"><!--LOGO--></span>
+      <div class="titleblock">
+        <div class="eyebrow">Weekly member review</div>
+        <h1>GBCA Dashboard</h1>
+      </div>
+    </div>
+    <div class="mast-meta">
+      <span class="draft-flag">v1.0 · 1.0 live · 2.0–4.0 sample</span>
+      <span id="asof"></span>
+    </div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="wrap">
+    <div class="weekpick">
+      <label for="week">Week</label>
+      <button id="prev" type="button" aria-label="Previous week">&#8249;</button>
+      <select id="week"></select>
+      <button id="next" type="button" aria-label="Next week">&#8250;</button>
+    </div>
+    <p class="cmp"><span class="swatch" aria-hidden="true"></span>Red marks the selected week on every chart. Sections 1.0-3.0 compare with the prior week; 4.0 reports by calendar month.</p>
+    <ul class="status-key" id="status-key"></ul>
+  </div>
+</div>
+
+<main>
+  <section class="summary wrap" aria-labelledby="sum-h">
+    <h2 class="sr-only" id="sum-h">This week at a glance</h2>
+    <div class="kpis" id="kpis"></div>
+    <div class="attention">
+      <h2>Needs attention this week</h2>
+      <ul id="attn"></ul>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="engagement" aria-labelledby="eng-h">
+    <header class="sec-head">
+      <h2 id="eng-h" tabindex="-1"><span class="num">1.0</span>Member Engagement<span class="tag live">Live</span></h2>
+      <p id="eng-lede"></p>
+    </header>
+    <article class="card eng-all">
+      <div class="card-head">
+        <div><h3>All members</h3><p class="sub" id="eng-all-sub"></p></div>
+        <div class="head-actions">
+          <button class="data-btn" type="button" aria-expanded="false" aria-controls="eng-detail" data-show="View detail" data-hide="Hide detail">View detail</button>
+          <a class="link-btn" id="eng-report" target="_blank" rel="noopener">Full report <span aria-hidden="true">&#8599;</span></a>
+        </div>
+      </div>
+      <div class="eng-grid">
+        <div id="eng-all-body"></div>
+        <div>
+          <div class="sublabel">Share of members by week</div>
+          <div class="chart" id="eng-cols"></div>
+          <div class="ppd-key" id="eng-key"></div>
+        </div>
+      </div>
+      <div class="data-table tscroll" id="eng-detail" hidden></div>
+    </article>
+    <div class="grid g-3" id="eng-panels"></div>
+  </section>
+
+  <section class="sec wrap" id="nps" aria-labelledby="nps-h">
+    <header class="sec-head">
+      <h2 id="nps-h"><span class="num">2.0</span>Net Promoter Score<span class="tag sample">Sample</span></h2>
+      <p>Would members recommend GBCA to a peer firm? Scored on a rolling 90-day window, because one week of responses is too few to read on its own.</p>
+    </header>
+    <div class="grid g-57">
+      <article class="card">
+        <div class="card-head"><h3>Score this week</h3><span id="nps-pill"></span></div>
+        <div class="hero"><span class="hero-value" id="nps-value"></span><span id="nps-delta"></span></div>
+        <p class="sub" id="nps-sub"></p>
+        <div class="ppd" id="nps-ppd" role="img"></div>
+        <div class="ppd-key" id="nps-key"></div>
+        <div class="sublabel">By member class</div>
+        <div class="tscroll"><table id="nps-class"></table></div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <div><h3>Trend, last 13 weeks</h3><p class="sub">Rolling 90-day NPS at each week's close</p></div>
+          <button class="data-btn" type="button" aria-expanded="false" aria-controls="nps-data">View data</button>
+        </div>
+        <div class="chart" id="nps-chart"></div>
+        <div class="data-table tscroll" id="nps-data" hidden></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="value" aria-labelledby="val-h">
+    <header class="sec-head">
+      <h2 id="val-h"><span class="num">3.0</span>Member Value<span class="tag sample">Sample</span></h2>
+      <p>Is the measured value GBCA delivers outpacing the dues members pay? Value counts only programs with a documented dollar basis.</p>
+    </header>
+    <div class="grid g-57">
+      <article class="card">
+        <div class="card-head"><h3>Value-to-dues multiple</h3><span id="val-pill"></span></div>
+        <div class="hero"><span class="hero-value" id="val-value"></span><span id="val-delta"></span></div>
+        <p class="sub" id="val-sub"></p>
+        <div class="sublabel">By member class</div>
+        <div class="hbars" id="val-class"></div>
+        <p class="note">The tick on each bar marks 1.0×, where measured value equals dues paid.</p>
+        <div class="sublabel">Perceived value</div>
+        <p class="sub" id="val-worth"></p>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <div><h3>Value delivered year to date, by program</h3><p class="sub" id="val-stream-sub"></p></div>
+          <button class="data-btn" type="button" aria-expanded="false" aria-controls="val-data">View data</button>
+        </div>
+        <div class="hbars" id="val-streams"></div>
+        <p class="note">Issue resolution equals the cost avoidance reported in section 4.0.</p>
+        <div class="data-table tscroll" id="val-data" hidden></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="sec wrap" id="issues" aria-labelledby="iss-h">
+    <header class="sec-head">
+      <h2 id="iss-h"><span class="num">4.0</span>Issue Resolution<span class="tag sample">Sample</span></h2>
+      <p id="iss-lede"></p>
+    </header>
+    <div class="stats" id="iss-stats"></div>
+    <div class="grid g-2">
+      <article class="card">
+        <div class="card-head">
+          <div><h3>Opened and resolved, by month</h3><p class="sub" id="iss-chart-sub"></p></div>
+          <button class="data-btn" type="button" aria-expanded="false" aria-controls="iss-data">View data</button>
+        </div>
+        <div class="legend" style="margin-top:8px"><span><i class="k-a"></i>Opened</span><span><i class="k-b"></i>Resolved</span></div>
+        <div class="chart" id="iss-chart"></div>
+        <p class="note" id="iss-chart-note"></p>
+        <div class="data-table tscroll" id="iss-data" hidden></div>
+      </article>
+      <article class="card">
+        <div class="card-head">
+          <div><h3>Cost avoidance year to date, by issue type</h3><p class="sub" id="cat-sub"></p></div>
+          <button class="data-btn" type="button" aria-expanded="false" aria-controls="cat-data">View data</button>
+        </div>
+        <div class="hbars" id="iss-cats"></div>
+        <div class="data-table tscroll" id="cat-data" hidden></div>
+      </article>
+    </div>
+    <article class="card next-card">
+      <div class="next-copy">
+        <h3>Resolved issue log</h3>
+        <p class="sub" id="log-teaser"></p>
+      </div>
+      <button type="button" class="next-btn" id="open-log"></button>
+    </article>
+  </section>
+</main>
+
+<section class="logpage wrap" id="issue-log" aria-labelledby="log-h" hidden>
+  <button type="button" class="back-btn" data-back>&#8592; Back to dashboard</button>
+  <header class="sec-head">
+    <h2 id="log-h"><span class="num">4.1</span>Resolved Issue Log<span class="tag sample">Sample</span></h2>
+    <p id="log-lede"></p>
+  </header>
+  <div class="stats" id="log-stats"></div>
+  <article class="card" style="margin-top:18px">
+    <div class="card-head"><h3 id="log-title"></h3><p class="sub">Select a column heading to sort. Every dollar figure carries its basis.</p></div>
+    <div class="tscroll"><table id="log-table"></table></div>
+    <p class="note">Source: GBCA_Issue_Resolution_Log.xlsx, Issue Log sheet. Sample data.</p>
+  </article>
+  <button type="button" class="back-btn" data-back>&#8592; Back to dashboard</button>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h2>Definitions</h2>
+      <dl>
+        <div><dt>Member count</dt><dd>Current members of the Active, Associate and Affiliate membership types in GrowthZone, from the weekly engagement run. The tile opens the GBCA Member Map.</dd></div>
+        <div><dt>Engaged, Low Risk, Risk</dt><dd>Each member is scored weekly on GBCA's 2026 Active, Associate or Affiliate engagement scorecard from GrowthZone data for the trailing 12 months. Engaged combines Highly Engaged and Engaged (a score above 75 for Active and Associate members, above 65 for Affiliates). Risk combines Moderate and High Risk (40 or below). Low Risk is everything between. The full report in OneDrive keeps all five bands.</dd></div>
+        <div><dt>Net Promoter Score</dt><dd>Percent promoters (9-10) minus percent detractors (0-6) on "How likely are you to recommend GBCA membership to a peer firm?" Rolling 90 days.</dd></div>
+        <div><dt>Value-to-dues multiple</dt><dd>Value delivered year to date divided by dues recognized year to date (annual dues pro-rated by week), so the ratio is comparable week to week.</dd></div>
+        <div><dt>Cost avoidance</dt><dd>A conservative estimate of cost a member did not incur because GBCA resolved the issue, recorded with its basis. Guidance-only resolutions count toward volume but carry $0.</dd></div>
+      </dl>
+    </div>
+    <div class="meta">
+      <h2>About this dashboard</h2>
+      <p><strong>Live:</strong> the member count and section 1.0, rebuilt every Sunday night from the latest GBCA Member Engagement Report (GrowthZone, refreshed Saturday night).</p>
+      <p><strong>Sample:</strong> sections 2.0 to 4.0 are still layout data. They are not GBCA actuals and should not be quoted; their weeks are aligned to the live calendar for layout only.</p>
+      <p>Weeks run Monday to Sunday (ISO weeks). Issue resolution (4.0) reports by calendar month; the month in progress is month to date and compares with the same days of the prior month. Targets shown are placeholders pending leadership sign-off.</p>
+      <p id="built"></p>
+    </div>
+  </div>
+</footer>
+
+<div id="tip" aria-hidden="true" hidden></div>
+<div id="loadfail" hidden style="max-width:640px;margin:32px auto;padding:18px 22px;border:1px solid #CE0E2D;background:#fff;color:#2D2D2D;font:15px/1.5 Calibri,Carlito,sans-serif">
+  <strong>The dashboard could not load its files.</strong> Open it from the synced OneDrive folder <em>0 - GBCA SharePoint/Dashboards</em> (it needs the <em>GBCA Dashboard files</em> folder beside it), or open the single-file copy in Box: 20_GBCA/80_Automations/GBCA Dashboard.
+</div>
+<!--SCRIPTS-->
+<script>if (!window.GBCA_READY) { document.getElementById("loadfail").hidden = false; }</script>
+</body>
+</html>

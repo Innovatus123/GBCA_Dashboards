@@ -5,3 +5,6 @@ engagement/reports/
 *.psv
 *.xlsx
 __pycache__/
+# Built dashboards and their weekly history hold live member figures: they live in Box and OneDrive.
+dashboard/out/
+dashboard/data/
