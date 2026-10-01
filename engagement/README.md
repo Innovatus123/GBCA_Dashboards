@@ -57,6 +57,22 @@ The API is read-only (GBCA's published spec has no endpoint that creates a field
 
 Once imported, the fields can be added as columns and filters in any GrowthZone contact report.
 
+## Weekly refresh (cloud routine)
+
+A Claude Code cloud routine runs `weekly.py` every Saturday at 11:15 PM Eastern:
+
+```
+python weekly.py --prev <last week's GBCA_Member_Engagement_Scores_<date>.json> --prev-date <date> [--key-file <key file>]
+```
+
+`weekly.py` pulls live GrowthZone data for the trailing 365 days, scores it, and stops before building anything if the pull is incomplete, fewer than 300 members come back, or the count fell more than 10% from last week. Otherwise it writes, under `reports/weekly/`:
+
+- `GBCA_Member_Engagement_Report.html`, compared with last week (who moved into or out of risk, who joined or left)
+- `GBCA_Member_Engagement_Scores_<date>.json`, next week's comparison file, with member spend removed
+- `summary.json`, the figures for the run report
+
+The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one. The key comes from `GROWTHZONE_API_KEY` when it is set; otherwise `--key-file` reads it from a text file, and the key is never printed. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
+
 ## Without the API: a GrowthZone report export
 
 Export the "GBCA Member Engagement Report" for each member type (.csv, or .xlsx with `pip install openpyxl`), then:
