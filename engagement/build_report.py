@@ -94,9 +94,9 @@ def build(scores, compare, as_of, window, compare_label, compare_note="", roster
     risk_share = 100 * len(at_risk) / total if total else 0
     trend = ""
     if before:
-        delta = risk_share - (100 * base_risk / base_total)
-        trend = (f" That is {abs(delta):.1f} points {'higher' if delta > 0 else 'lower'} than {compare_label} "
-                 f"({pct(base_risk, base_total)}, rescored the same way).")
+        delta = round(risk_share - (100 * base_risk / base_total), 1)
+        change = f"{abs(delta):.1f} points {'higher' if delta > 0 else 'lower'} than" if delta else "unchanged from"
+        trend = f" That is {change} {compare_label} ({pct(base_risk, base_total)}, rescored the same way)."
     active_share = pct(len(active_risk), len(active))
 
     moves_rows = "".join(
