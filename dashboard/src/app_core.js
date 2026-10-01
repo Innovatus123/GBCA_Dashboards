@@ -1,4 +1,4 @@
-/* GBCA Dashboard, part 1 of 3: data, formatting, metrics, status and chart helpers.
+/* GBCA Dashboard, part 1 of 4: data, formatting, metrics, status and SVG helpers.
    GBCA_LIVE comes from the weekly build (build_dashboard.py): the 13-week calendar, the live engagement
    counts from the GrowthZone engagement report, links and targets. GBCA_SAMPLE is the layout sample behind
    sections 2.0-4.0; its weeks are moved onto the live calendar so the week control scopes every section. */
