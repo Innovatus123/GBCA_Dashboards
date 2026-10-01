@@ -56,8 +56,9 @@ def mover_label(pair):
     return f"{after['name']} ({SHORT[before['corrected_level']]} to {SHORT[after['corrected_level']]})"
 
 
-def build(scores, compare, as_of, window, compare_label, compare_note=""):
+def build(scores, compare, as_of, window, compare_label, compare_note="", roster=None, roster_label=""):
     now = members(scores)
+    year = int(re.search(r"(\d{4})", as_of).group(1))
     before = members(compare) if compare else []
     dist, base = distribution(now), distribution(before) if before else None
     total = len(now)
@@ -84,8 +85,9 @@ def build(scores, compare, as_of, window, compare_label, compare_note=""):
             (worse if order.index(m["corrected_level"]) > order.index(p["corrected_level"]) else better).append((p, m))
     newly_risk = sorted([(p, m) for p, m in worse if m["corrected_level"] in RISK and p["corrected_level"] not in RISK],
                         key=lambda pm: pm[1]["corrected_score"])
-    joined = sorted([m for k, m in current.items() if k not in prior], key=lambda m: m["name"])
-    left = sorted([m for k, m in prior.items() if k not in current], key=lambda m: m["name"])
+    roster_prior = {norm(m["name"]): m for m in members(roster)} if roster else prior
+    joined = sorted([m for k, m in current.items() if k not in roster_prior], key=lambda m: m["name"])
+    left = sorted([m for k, m in roster_prior.items() if k not in current], key=lambda m: m["name"])
     base_total = len(before)
     base_risk = sum(1 for m in before if m["corrected_level"] in RISK)
 
@@ -110,18 +112,23 @@ def build(scores, compare, as_of, window, compare_label, compare_note=""):
         change_items.append(
             f"<li><b>{len(newly_risk)} members moved into Moderate or High Risk</b> since {compare_label}, and "
             f"{moved_in} moved out. <span class=\"impact\">{esc(examples)}</span></li>")
+    if joined or left:
+        since = roster_label or compare_label
         change_items.append(
-            f"<li><b>{len(joined)} joined and {len(left)} left</b> since {compare_label} "
-            f"({base_total} to {total} members). "
-            f"<span class=\"impact\">Joined: {esc(short_list(joined, 6, lambda m: m['name']))}. "
-            f"Left: {esc(short_list(left, 6, lambda m: m['name']))}.</span></li>")
+            f"<li><b>{len(joined)} joined and {len(left)} left</b> since {esc(since)}. "
+            f"<span class=\"impact\">Joined: {esc((short_list(joined, 6, lambda m: m['name']) or 'none').rstrip('.'))}. "
+            f"Left: {esc((short_list(left, 6, lambda m: m['name']) or 'none').rstrip('.'))}.</span></li>")
+    if before:
         change_items.append(
             f"<li><b>{len(worse)} members slipped a band and {len(better)} improved</b> overall. "
             f"<span class=\"impact\">Same organizations, same scoring rules, a newer 12-month window.</span></li>")
+    versus = ""
+    if roster:
+        old = members(roster)
+        versus = f", versus {sum(1 for m in old if m['dues_populated'])} of {len(old)} in {esc(roster_label or 'the comparison file')}"
     change_items.append(
-        f"<li><b>Dues now come from GrowthZone billing.</b> {dues_rows} of {total} members have dues recorded in the "
-        f"window, versus 27 of 340 in the Aug 4 export. <span class=\"impact\">The dues points in each scorecard can "
-        f"now be awarded.</span></li>")
+        f"<li><b>Dues come from GrowthZone billing.</b> {dues_rows} of {total} members have dues recorded in the "
+        f"window{versus}. <span class=\"impact\">The dues points in each scorecard can now be awarded.</span></li>")
 
     data = {
         "VALIDATED": dist,
@@ -181,7 +188,7 @@ def build(scores, compare, as_of, window, compare_label, compare_note=""):
     <div class="kpi"><div class="label">Moderate + High Risk</div><div class="value alert">{risk_share:.1f}%</div><div class="note">{len(at_risk)} members{f' &middot; {compare_label}: {pct(base_risk, base_total)}' if before else ''}</div></div>
     <div class="kpi"><div class="label">Active members at risk</div><div class="value alert">{active_share}</div><div class="note">{len(active_risk)} of {len(active)}</div></div>
     <div class="kpi"><div class="label">Engaged or better</div><div class="value">{len(engaged)}</div><div class="note">{pct(len(engaged), total)} of members</div></div>
-    <div class="kpi"><div class="label">High Risk in first year</div><div class="value">{len(first_year_high)}</div><div class="note">{pct(len(first_year_high), len(high))} of all High Risk are &le;1-year members</div></div>
+    <div class="kpi"><div class="label">High Risk, new members</div><div class="value">{len(first_year_high)}</div><div class="note">{pct(len(first_year_high), len(high))} of all High Risk joined in {year - 1} or later</div></div>
   </div>
 
   <div class="grid">
@@ -223,7 +230,7 @@ def build(scores, compare, as_of, window, compare_label, compare_note=""):
         <h2><span class="num">4</span>Where to focus</h2>
         <div class="focus">
           <div class="card"><h3><span class="big">{len(active_risk)}</span>Active members at risk</h3><p>Highest dues and bargaining value. Outreach should come from executives and Board peers (see table 2).</p></div>
-          <div class="card"><h3><span class="big">{len(first_year)}</span>First-year members</h3><p>{len(first_year_high)} score High Risk because the model rewards tenure and event history they can't have yet. Put them on a 90-day onboarding track.</p></div>
+          <div class="card"><h3><span class="big">{len(first_year)}</span>New members (joined {year - 1} or later)</h3><p>{len(first_year_high)} score High Risk because the model rewards tenure and event history they can't have yet. Put them on a 90-day onboarding track.</p></div>
           <div class="card"><h3><span class="big">{len(tenured_high)}</span>High Risk with 20+ years</h3><p>Long-time renewers with little participation. A quarterly relationship call is enough.</p><p class="names">{esc(short_list(tenured_high, 6, lambda m: f"{m['name']} ({int(m['years'])} yrs)"))}</p></div>
           <div class="card"><h3><span class="big">{len(near)}</span>Within 5 points of Engaged</h3><p>One committee seat or 2&ndash;3 events moves them up a band.</p><p class="names">{esc(short_list(near, 11, lambda m: m['name']))}</p></div>
         </div>
@@ -267,6 +274,8 @@ if __name__ == "__main__":
     parser.add_argument("--window", required=True)
     parser.add_argument("--compare-label", default="Aug 4")
     parser.add_argument("--compare-note", default="", help="one sentence describing the comparison period")
+    parser.add_argument("--roster-compare", help="scores JSON whose member list to compare joins and departures against")
+    parser.add_argument("--roster-label", default="", help="label for --roster-compare, e.g. 'the Aug 4 export'")
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     with open(args.scores, encoding="utf-8") as f:
@@ -275,7 +284,11 @@ if __name__ == "__main__":
     if args.compare:
         with open(args.compare, encoding="utf-8") as f:
             compare = json.load(f)
-    page = build(scores, compare, args.as_of, args.window, args.compare_label, args.compare_note)
+    roster = None
+    if args.roster_compare:
+        with open(args.roster_compare, encoding="utf-8") as f:
+            roster = json.load(f)
+    page = build(scores, compare, args.as_of, args.window, args.compare_label, args.compare_note, roster, args.roster_label)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write(page)
