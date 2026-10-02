@@ -72,7 +72,7 @@ python weekly.py --prev <last week's GBCA_Member_Engagement_Scores_<date>.json> 
 - `summary.json`, the figures for the run report
 - `GBCA_Member_Engagement_Report_New.html` and `GBCA_Member_Engagement_Scores_New_<date>.json`, the same week under scoring model v2 (`--prev-new` takes last week's file)
 
-The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one. The key comes from `GROWTHZONE_API_KEY` when it is set; otherwise `--key-file` reads it from a text file, and the key is never printed. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
+The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one, and does the same for `GBCA_Member_Engagement_Report_New.html` (archived as `GBCA_Member_Engagement_Report_New_<previous date>.html`). Both scores files go to Box `Archived/Data` as next week's comparison files. The key comes from `GROWTHZONE_API_KEY` when it is set; otherwise `--key-file` reads it from a text file, and the key is never printed. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
 
 ## Scoring model v2 (go-forward model)
 
