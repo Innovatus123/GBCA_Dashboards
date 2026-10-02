@@ -9,6 +9,8 @@ report and uploads the new one to Box and OneDrive with its connectors.
 Writes
   reports/weekly/GBCA_Member_Engagement_Report.html
   reports/weekly/GBCA_Member_Engagement_Scores_<date>.json   next week's --prev (no spend figures)
+  reports/weekly/GBCA_Member_Engagement_Report_New.html      scoring model v2 (go-forward model)
+  reports/weekly/GBCA_Member_Engagement_Scores_New_<date>.json   next week's --prev-new
   reports/weekly/summary.json                                 what changed, for the run report
 
 Exits non-zero, before writing the report, if the pull is incomplete or the member count
@@ -29,6 +31,7 @@ TZ = "America/New_York"
 TYPES = ("Active", "Associate", "Affiliate")
 RISK = ("Moderate Risk", "High Risk")
 REPORT_NAME = "GBCA_Member_Engagement_Report.html"
+REPORT_NEW = "GBCA_Member_Engagement_Report_New.html"
 
 
 def fail(message):
@@ -80,6 +83,7 @@ def main():
     parser = argparse.ArgumentParser(description="Weekly GBCA Member Engagement Report refresh.")
     parser.add_argument("--prev", help="previous week's scores JSON (GBCA_Member_Engagement_Scores_<date>.json)")
     parser.add_argument("--prev-date", help="date of the previous report, YYYY-MM-DD")
+    parser.add_argument("--prev-new", help="previous week's model v2 scores (GBCA_Member_Engagement_Scores_New_<date>.json)")
     parser.add_argument("--key-file", help="text file holding the GrowthZone API key, used when "
                                            "GROWTHZONE_API_KEY is not set")
     parser.add_argument("--out", default=os.path.join(HERE, "reports", "weekly"))
@@ -130,6 +134,22 @@ def main():
     run(build, env)
     write_archive_scores(scores_path, os.path.join(args.out, f"GBCA_Member_Engagement_Scores_{today.isoformat()}.json"))
 
+    # Scoring model v2 (the go-forward model): same pull, separate report for comparison.
+    scores_v2 = os.path.join(data, "scores_v2.json")
+    run([sys.executable, "model_v2.py", "--data", data, "--json", scores_v2], env)
+    report_new = os.path.join(args.out, REPORT_NEW)
+    build_new = [sys.executable, "build_report_v2.py", "--scores", scores_v2, "--as-of", label(today),
+                 "--old-scores", scores_path, "--out", report_new]
+    if args.prev_new and os.path.exists(args.prev_new):
+        since = f"{prev_date:%b} {prev_date.day}" if prev_date else "last week"
+        build_new += ["--compare", args.prev_new, "--compare-label", since]
+    run(build_new, env)
+    with open(scores_v2, encoding="utf-8") as f:
+        v2 = json.load(f)
+    slim = {"model": v2["model"], "members": [{k: m[k] for k in ("cid", "name", "type", "score", "risk", "band")} for m in v2["members"]]}
+    with open(os.path.join(args.out, f"GBCA_Member_Engagement_Scores_New_{today.isoformat()}.json"), "w", encoding="utf-8") as f:
+        json.dump(slim, f, separators=(",", ":"))
+
     def risk_share(rows):
         return round(100 * sum(m["corrected_level"] in RISK for m in rows) / len(rows), 1) if rows else None
 
@@ -152,6 +172,14 @@ def main():
                                   and before[n]["corrected_level"] not in RISK),
         "moved_out_of_risk": sorted(n for n, m in after.items() if n in before and m["corrected_level"] not in RISK
                                     and before[n]["corrected_level"] in RISK),
+        "new_model": {
+            "report": report_new,
+            "report_bytes": os.path.getsize(report_new),
+            "watch_list": sum(m["band"] in ("Watch", "At Risk") for m in v2["members"]),
+            "at_risk": sum(m["band"] == "At Risk" for m in v2["members"]),
+            "expected_departures": round(sum(m["risk"] for m in v2["members"]), 1),
+            "watch_list_by_type": {t: sum(m["type"] == t and m["band"] in ("Watch", "At Risk") for m in v2["members"]) for t in TYPES},
+        },
     }
     with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
@@ -164,6 +192,9 @@ def main():
     if prev:
         print(f"Joined {len(summary['joined'])}, left {len(summary['left'])}, moved into risk "
               f"{len(summary['moved_into_risk'])}, moved out of risk {len(summary['moved_out_of_risk'])}")
+    nm = summary["new_model"]
+    print(f"New report {report_new} ({nm['report_bytes']} bytes): watch list {nm['watch_list']} (At Risk {nm['at_risk']}), "
+          f"expected departures {nm['expected_departures']}")
 
 
 if __name__ == "__main__":

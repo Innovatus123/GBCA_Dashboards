@@ -351,21 +351,40 @@ def cmd_discover(config, args):
     print(f"\nRaw samples written to {args.out} ({gz.calls} API calls). Keep this folder out of git.")
 
 
+def payment_date(item, as_of):
+    """Earliest real payment applied to a purchase line item on or before `as_of`.
+    Credits and write-offs carry PaymentId 0 and do not count as payment."""
+    apps = item.get("Applications") or []
+    if isinstance(apps, str):
+        import ast
+        try:
+            apps = ast.literal_eval(apps)
+        except (ValueError, SyntaxError):
+            apps = []
+    dates = [parse_date(a.get("PaymentDate") or a.get("ApplicationDate")) for a in apps
+             if str(a.get("PaymentId")) not in ("0", "None") and not a.get("VoidedDate")]
+    dates = [d for d in dates if d and d <= as_of]
+    return min(dates) if dates else None
+
+
 def purchase_activity(gz, config, member_ids, person_to_org, start, end, cache_dir, workers):
-    """Org ContactId -> {"dues", "other", "events"} from purchases dated inside [start, end].
+    """Org ContactId -> {"dues", "other", "events", "last", "late", "unpaid"} from purchases dated inside [start, end].
 
     A purchase counts toward the member organization it was billed to, or the
     organization of the person who paid. Line items typed as membership dues are
     dues; every other line item is non-dues spend. Event attendees are the
     quantities on event registration line items, since GrowthZone counts
-    registrants as attendees."""
+    registrants as attendees. "last" is the date of the latest non-dues purchase or event
+    registration; "late" lists days between due date and payment for each dues invoice due by
+    `end`, and "unpaid" marks a dues invoice with no payment by `end` (scoring model v2 inputs)."""
     listing = gz.get("/api/purchase") or []
     listing = listing.get("Results", listing) if isinstance(listing, dict) else listing
-    ids = []
+    ids, dates = [], {}
     for p in listing:
         when = parse_date(p.get("PurchaseDate"))
         if when and start <= when <= end:
             ids.append(p["PurchaseId"])
+            dates[p["PurchaseId"]] = when
     os.makedirs(cache_dir, exist_ok=True)
 
     def detail(pid):
@@ -382,7 +401,8 @@ def purchase_activity(gz, config, member_ids, person_to_org, start, end, cache_d
     event_types = {t.lower() for t in config["purchases"]["event_fee_types"]}
     totals, unmatched = {}, 0
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for n, p in enumerate(pool.map(detail, ids), 1):
+        for n, (pid, p) in enumerate(zip(ids, pool.map(detail, ids)), 1):
+            when = dates[pid]
             candidates = [p.get("ContactId")] + [c.get("ContactId") for c in p.get("Contacts") or []]
             org = next((c for c in candidates if c in member_ids), None)
             if org is None:
@@ -390,14 +410,23 @@ def purchase_activity(gz, config, member_ids, person_to_org, start, end, cache_d
             if org is None:
                 unmatched += 1
                 continue
-            t = totals.setdefault(org, {"dues": 0.0, "other": 0.0, "events": 0})
+            t = totals.setdefault(org, {"dues": 0.0, "other": 0.0, "events": 0, "last": None, "late": [], "unpaid": False})
             for item in p.get("LineItems") or []:
                 fee = (item.get("FeeItemType") or "").lower()
                 amount = float(item.get("Total") or 0)
                 if fee in dues_types:
                     t["dues"] += amount
+                    due = parse_date(p.get("DueDate")) or parse_date(p.get("InvoiceDate")) or when
+                    if due <= end and amount > 0:
+                        paid = payment_date(item, end)
+                        if paid is None:
+                            t["unpaid"] = True
+                        else:
+                            t["late"].append((paid - due).days)
                 else:
                     t["other"] += amount
+                    if amount > 0 or fee in event_types:
+                        t["last"] = max(t["last"] or when, when)
                 if fee in event_types:
                     t["events"] += int(item.get("Quantity") or 1)
             if n % 250 == 0:
@@ -493,11 +522,35 @@ def cmd_pull(config, args):
     problems = reconcile(report_rows, config)
     normalized = normalize(report_rows, config)
     write_outputs(args.out, report_rows, normalized)
+    write_features_v2(args.out, report_rows, members, activity, end)
     print(f"\nWrote {args.out}/engagement_report.csv and active/associate/affiliate.psv ({gz.calls} API calls)")
     if problems and not args.allow_gaps:
         print(f"\nNOT READY TO SCORE: {', '.join(problems)} came back empty, which would understate every score. "
               "Fix the mapping in growthzone_config.json (run `discover`), or rerun with --allow-gaps.")
         sys.exit(2)
+
+
+FEATURES_V2 = ["cid", "name", "type", "type_name", "tier", "years", "spend", "events", "recency_days",
+               "dues_status", "dues", "bargaining", "committee"]
+
+
+def write_features_v2(out_dir, report_rows, members, activity, as_of):
+    """Inputs for scoring model v2 (model_v2.py), one row per current member."""
+    import model_v2
+    with open(os.path.join(out_dir, "features_v2.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=FEATURES_V2)
+        w.writeheader()
+        for row in report_rows:
+            cid = row["GrowthZone Contact Id"]
+            m = members[cid]
+            a = activity.get(cid, {"dues": 0.0, "other": 0.0, "events": 0, "last": None, "late": [], "unpaid": False})
+            tier = model_v2.tier_millions(m["type_name"])
+            w.writerow({"cid": cid, "name": row["Contact Name"], "type": m["type"], "type_name": m["type_name"],
+                        "tier": "" if tier is None else tier, "years": m["years"], "spend": f"{a['other']:.2f}",
+                        "events": a["events"], "recency_days": "" if a["last"] is None else (as_of - a["last"]).days,
+                        "dues_status": model_v2.dues_status(a["late"], a["unpaid"]), "dues": f"{a['dues']:.2f}",
+                        "bargaining": "1" if (row.get("All Bargaining Rights") or "").strip() else "",
+                        "committee": row.get("All Committee Participation") or ""})
 
 
 def read_export(path):

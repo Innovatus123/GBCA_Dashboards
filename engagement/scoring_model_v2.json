@@ -1,0 +1,321 @@
+{
+ "version": "2.0",
+ "trained": "2026-10-02",
+ "training_cohorts": "Oct 1, 2016 - Oct 1, 2025",
+ "bands": {
+  "At Risk": 0.15,
+  "Watch": 0.07,
+  "Stable": 0.03,
+  "Secure": 0.0
+ },
+ "scorecards": {
+  "Affiliate": {
+   "intercept": -2.747324235543454,
+   "scale": 16.468552863253503,
+   "anchor": 0.17841772195194672,
+   "groups": {
+    "tenure": [
+     {
+      "label": "first two years",
+      "coef": 1.1350492903702167,
+      "points": 0.0
+     },
+     {
+      "label": "2-4 years",
+      "coef": 0.7209044733492949,
+      "points": 6.8
+     },
+     {
+      "label": "5-9 years",
+      "coef": 0.016713008137366342,
+      "points": 18.4
+     },
+     {
+      "label": "10-19 years",
+      "coef": -0.8240046872918944,
+      "points": 32.3
+     },
+     {
+      "label": "20+ years",
+      "coef": -1.0523231329937783,
+      "points": 36.0
+     }
+    ],
+    "spend": [
+     {
+      "label": "under $1K",
+      "coef": 0.762342949450528,
+      "points": 0.0
+     },
+     {
+      "label": "$1K-5K",
+      "coef": 0.021396004168066054,
+      "points": 12.2
+     },
+     {
+      "label": "$5K+",
+      "coef": -1.2650860872944414,
+      "points": 33.4
+     }
+    ],
+    "recency": [
+     {
+      "label": "within 6 months",
+      "coef": -0.5347096838183698,
+      "points": 16.0
+     },
+     {
+      "label": "6-12 months ago",
+      "coef": 0.4395985696819024,
+      "points": 0.0
+     },
+     {
+      "label": "none in 12 months",
+      "coef": 0.16788129257782858,
+      "points": 4.5
+     }
+    ],
+    "dues": [
+     {
+      "label": "paid on time",
+      "coef": -0.22760944905633423,
+      "points": 13.4
+     },
+     {
+      "label": "paid 1-4 months late",
+      "coef": -0.07048466098377926,
+      "points": 10.9
+     },
+     {
+      "label": "4+ months late or unpaid",
+      "coef": 0.5887511479927533,
+      "points": 0.0
+     },
+     {
+      "label": "no dues invoice on record",
+      "coef": -0.2943180863814307,
+      "points": 14.5
+     }
+    ]
+   }
+  },
+  "Active": {
+   "intercept": -2.9417221366456667,
+   "scale": 32.210768997427834,
+   "anchor": -1.5575751471878658,
+   "groups": {
+    "tenure": [
+     {
+      "label": "first two years",
+      "coef": 0.43208824376428234,
+      "points": 0.0
+     },
+     {
+      "label": "2-4 years",
+      "coef": 0.24722060856719583,
+      "points": 6.0
+     },
+     {
+      "label": "5-9 years",
+      "coef": -0.08353919130198573,
+      "points": 16.6
+     },
+     {
+      "label": "10-19 years",
+      "coef": -0.20699852518197834,
+      "points": 20.6
+     },
+     {
+      "label": "20+ years",
+      "coef": -0.3888620237307092,
+      "points": 26.4
+     }
+    ],
+    "spend": [
+     {
+      "label": "under $1K",
+      "coef": 0.34541977994169887,
+      "points": 0.0
+     },
+     {
+      "label": "$1K-5K",
+      "coef": -0.18361869354720722,
+      "points": 17.0
+     },
+     {
+      "label": "$5K+",
+      "coef": -0.18625006052165807,
+      "points": 17.1
+     }
+    ],
+    "recency": [
+     {
+      "label": "within 6 months",
+      "coef": -0.41504912791142706,
+      "points": 21.5
+     },
+     {
+      "label": "6-12 months ago",
+      "coef": 0.2524244021932466,
+      "points": 0.0
+     },
+     {
+      "label": "none in 12 months",
+      "coef": 0.1868827687962332,
+      "points": 2.1
+     }
+    ],
+    "dues": [
+     {
+      "label": "paid on time",
+      "coef": -0.20766087583788984,
+      "points": 13.8
+     },
+     {
+      "label": "paid late or unpaid",
+      "coef": 0.22140140911208223,
+      "points": 0.0
+     },
+     {
+      "label": "no dues invoice on record",
+      "coef": -0.013831421157386592,
+      "points": 7.6
+     }
+    ],
+    "tier": [
+     {
+      "label": "under $10M",
+      "coef": 0.05669457423750612,
+      "points": 0.0
+     },
+     {
+      "label": "$10M+",
+      "coef": -0.446373227427908,
+      "points": 16.2
+     }
+    ],
+    "bargaining": [
+     {
+      "label": "yes",
+      "coef": -0.07620946809217867,
+      "points": 4.9
+     },
+     {
+      "label": "no",
+      "coef": 0.07611858020898449,
+      "points": 0.0
+     }
+    ]
+   }
+  },
+  "Associate": {
+   "intercept": -2.6429295741214798,
+   "scale": 32.609653402092356,
+   "anchor": -1.3641324221871676,
+   "groups": {
+    "tenure": [
+     {
+      "label": "first two years",
+      "coef": 0.43208824376428234,
+      "points": 0.0
+     },
+     {
+      "label": "2-4 years",
+      "coef": 0.24722060856719583,
+      "points": 6.0
+     },
+     {
+      "label": "5-9 years",
+      "coef": -0.08353919130198573,
+      "points": 16.8
+     },
+     {
+      "label": "10-19 years",
+      "coef": -0.20699852518197834,
+      "points": 20.8
+     },
+     {
+      "label": "20+ years",
+      "coef": -0.3888620237307092,
+      "points": 26.8
+     }
+    ],
+    "spend": [
+     {
+      "label": "under $1K",
+      "coef": 0.34541977994169887,
+      "points": 0.0
+     },
+     {
+      "label": "$1K-5K",
+      "coef": -0.18361869354720722,
+      "points": 17.3
+     },
+     {
+      "label": "$5K+",
+      "coef": -0.18625006052165807,
+      "points": 17.3
+     }
+    ],
+    "recency": [
+     {
+      "label": "within 6 months",
+      "coef": -0.41504912791142706,
+      "points": 21.8
+     },
+     {
+      "label": "6-12 months ago",
+      "coef": 0.2524244021932466,
+      "points": 0.0
+     },
+     {
+      "label": "none in 12 months",
+      "coef": 0.1868827687962332,
+      "points": 2.1
+     }
+    ],
+    "dues": [
+     {
+      "label": "paid on time",
+      "coef": -0.20766087583788984,
+      "points": 14.0
+     },
+     {
+      "label": "paid late or unpaid",
+      "coef": 0.22140140911208223,
+      "points": 0.0
+     },
+     {
+      "label": "no dues invoice on record",
+      "coef": -0.013831421157386592,
+      "points": 7.7
+     }
+    ],
+    "tier": [
+     {
+      "label": "under $2M",
+      "coef": -0.04865526328598235,
+      "points": 0.0
+     },
+     {
+      "label": "$2M+",
+      "coef": -0.5137478902248939,
+      "points": 15.2
+     }
+    ],
+    "bargaining": [
+     {
+      "label": "yes",
+      "coef": -0.07620946809217867,
+      "points": 5.0
+     },
+     {
+      "label": "no",
+      "coef": 0.07611858020898449,
+      "points": 0.0
+     }
+    ]
+   }
+  }
+ }
+}
