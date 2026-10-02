@@ -127,8 +127,8 @@ def build(scores, model, as_of, old, validation, compare=None, compare_label="")
             + " &middot; ".join(f'{esc(b["label"])} <b>{b["points"]:.0f}</b>' for b in sorted(bins, key=lambda b: -b["points"]))
             + "</td></tr>" for g, bins in card["groups"].items())
         return (f'<div class="sc"><h3>{t}</h3><table class="sct">{rows}</table>'
-                f'<p class="cut">At Risk at {th["At Risk"]:.0f} or below &middot; Watch {th["At Risk"]:.0f}&ndash;{th["Watch"]:.0f} &middot; '
-                f'Secure above {th["Stable"]:.0f}</p></div>')
+                f'<p class="cut">At Risk at {int(th["At Risk"])} or below &middot; Watch {int(th["At Risk"]) + 1}&ndash;{int(th["Watch"])} &middot; '
+                f'Stable {int(th["Watch"]) + 1}&ndash;{int(th["Stable"])} &middot; Secure above {int(th["Stable"])}</p></div>')
 
     def calib(seg_v):
         return " &middot; ".join(
