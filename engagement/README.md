@@ -10,8 +10,18 @@ Member data never goes in this repository, because the repository is public. Eve
 ## One-time setup: the GrowthZone API key
 
 1. A GrowthZone admin creates a key at **Settings > Advanced Settings > API Key Permissions**. Give it read access to contacts, memberships, groups, custom fields, events and purchases/invoices. It does not need write access.
-2. Store the key as an environment variable named `GROWTHZONE_API_KEY`:
-   - **Claude Code cloud sessions:** open the environment menu in the session title bar, choose Edit, and add `GROWTHZONE_API_KEY`. New sessions pick it up.
+2. Give the scripts the key:
+   - **Claude Code cloud sessions:** add it as an API credential, not an environment variable (environment variables are readable by anyone using the environment). Open the environment menu in the session title bar, choose Edit, then **API credentials > Add credential**:
+
+     | Field | Value |
+     |---|---|
+     | Name | `GrowthZone API (read-only)` |
+     | Credential type | Bearer (the default) |
+     | Allowed websites | `generalbuildingcontractorsassociationagc.growthzoneapp.com` |
+     | Path prefixes | `/api/` |
+     | Custom headers | Name `Authorization`, Prefix `ApiKey` (replace `Bearer`), Value: the key |
+
+     Under **See resolved curl example** the header should read `Authorization: ApiKey ...`. Select **Connect**. The proxy adds the header to every request to that host, so the scripts run with no key in the environment, and the key is never visible to the session.
    - **Windows:** `setx GROWTHZONE_API_KEY "<key>"`, then open a new terminal.
 3. Never commit the key or paste it into chat.
 
@@ -72,7 +82,7 @@ python weekly.py --prev <last week's GBCA_Member_Engagement_Scores_<date>.json> 
 - `summary.json`, the figures for the run report
 - `GBCA_Member_Engagement_Report_New.html` and `GBCA_Member_Engagement_Scores_New_<date>.json`, the same week under scoring model v2 (`--prev-new` takes last week's file)
 
-The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one, and does the same for `GBCA_Member_Engagement_Report_New.html` (archived as `GBCA_Member_Engagement_Report_New_<previous date>.html`). Both scores files go to Box `Archived/Data` as next week's comparison files. The key comes from `GROWTHZONE_API_KEY` when it is set; otherwise `--key-file` reads it from a text file, and the key is never printed. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
+The routine then moves each destination's current `GBCA_Member_Engagement_Report.html` into its `Archived` folder as `GBCA_Member_Engagement_Report_<previous date>.html` and uploads the new one, and does the same for `GBCA_Member_Engagement_Report_New.html` (archived as `GBCA_Member_Engagement_Report_New_<previous date>.html`). Both scores files go to Box `Archived/Data` as next week's comparison files. The key comes from `GROWTHZONE_API_KEY` when it is set, then from `--key-file` (a text file; the key is never printed); with neither, the environment's GrowthZone API credential authenticates the pull. Dates follow Eastern time, because 11:15 PM Saturday is already Sunday in UTC.
 
 ## Scoring model v2 (go-forward model)
 

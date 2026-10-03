@@ -16,6 +16,8 @@ Commands
                score and level into GrowthZone custom fields (the API cannot write).
 
 Credentials (never commit them)
+  Cloud sessions: an API credential on the cloud environment adds the key to each request,
+                           so none of the variables below is needed (see README.md).
   GROWTHZONE_API_KEY       API key from GrowthZone > Settings > Advanced Settings >
                            API Key Permissions. Sent as "Authorization: ApiKey <key>".
   GROWTHZONE_ACCESS_TOKEN  Alternative: an OAuth access token, sent as Bearer.
@@ -74,12 +76,15 @@ class GrowthZone:
     """Minimal read-only GrowthZone REST client (stdlib only)."""
 
     def __init__(self, base_url, api_key=None, access_token=None, pause=0.15):
-        if not (api_key or access_token):
-            raise GrowthZoneError(
-                "No GrowthZone credential found. Set GROWTHZONE_API_KEY (or GROWTHZONE_ACCESS_TOKEN) "
-                "in the environment; see engagement/README.md.")
         self.base_url = base_url.rstrip("/")
-        self.auth = f"ApiKey {api_key}" if api_key else f"Bearer {access_token}"
+        # With no key in the environment, requests go out without an Authorization header and
+        # the cloud environment's API credential adds it on the way out (see README).
+        if api_key:
+            self.auth = f"ApiKey {api_key}"
+        elif access_token:
+            self.auth = f"Bearer {access_token}"
+        else:
+            self.auth = None
         self.pause = pause
         self.calls = 0
 
@@ -89,8 +94,10 @@ class GrowthZone:
             url += "?" + urllib.parse.urlencode(params, safe="$")
         data = json.dumps(body).encode() if body is not None else None
         for attempt in range(5):
-            req = urllib.request.Request(url, data=data, method=method, headers={
-                "Authorization": self.auth, "Accept": "application/json", "Content-Type": "application/json"})
+            headers = {"Accept": "application/json", "Content-Type": "application/json"}
+            if self.auth:
+                headers["Authorization"] = self.auth
+            req = urllib.request.Request(url, data=data, method=method, headers=headers)
             try:
                 self.calls += 1
                 with urllib.request.urlopen(req, timeout=60) as resp:
@@ -98,6 +105,11 @@ class GrowthZone:
                 time.sleep(self.pause)
                 return json.loads(raw) if raw else None
             except urllib.error.HTTPError as e:
+                if e.code == 401 and not self.auth:
+                    raise GrowthZoneError(
+                        f"401 from {path}: no GrowthZone key reached the API. Add the GrowthZone API "
+                        "credential to the cloud environment, or set GROWTHZONE_API_KEY; see "
+                        "engagement/README.md.") from None
                 if e.code in (401, 403):
                     raise GrowthZoneError(
                         f"{e.code} from {path}: the credential was rejected or lacks permission for this "

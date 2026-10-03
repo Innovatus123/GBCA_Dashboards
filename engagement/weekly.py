@@ -85,7 +85,8 @@ def main():
     parser.add_argument("--prev-date", help="date of the previous report, YYYY-MM-DD")
     parser.add_argument("--prev-new", help="previous week's model v2 scores (GBCA_Member_Engagement_Scores_New_<date>.json)")
     parser.add_argument("--key-file", help="text file holding the GrowthZone API key, used when "
-                                           "GROWTHZONE_API_KEY is not set")
+                                           "GROWTHZONE_API_KEY is not set and the environment "
+                                           "has no GrowthZone API credential")
     parser.add_argument("--out", default=os.path.join(HERE, "reports", "weekly"))
     parser.add_argument("--min-members", type=int, default=300)
     parser.add_argument("--max-drop", type=float, default=0.10, help="largest allowed week-over-week drop")
@@ -95,9 +96,8 @@ def main():
     # GrowthZone dates and tenure follow Eastern time; the cloud runs in UTC, where 11:15 PM
     # Saturday is already Sunday.
     env = dict(os.environ, TZ=TZ)
-    if not (env.get("GROWTHZONE_API_KEY") or env.get("GROWTHZONE_ACCESS_TOKEN")):
-        if not args.key_file:
-            fail("no GrowthZone key. Set GROWTHZONE_API_KEY or pass --key-file.")
+    # Without a key here, the cloud environment's API credential authenticates the pull.
+    if not (env.get("GROWTHZONE_API_KEY") or env.get("GROWTHZONE_ACCESS_TOKEN")) and args.key_file:
         env["GROWTHZONE_API_KEY"] = key_from_file(args.key_file)
     today = dt.datetime.now(ZoneInfo(TZ)).date()
     start = today - dt.timedelta(days=365)
